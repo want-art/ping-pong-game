@@ -1,0 +1,214 @@
+// Canvas and context
+const canvas = document.getElementById('pongCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game objects
+const paddleWidth = 10;
+const paddleHeight = 80;
+const ballSize = 8;
+
+const player = {
+    x: 10,
+    y: canvas.height / 2 - paddleHeight / 2,
+    width: paddleWidth,
+    height: paddleHeight,
+    dy: 0,
+    speed: 6
+};
+
+const computer = {
+    x: canvas.width - paddleWidth - 10,
+    y: canvas.height / 2 - paddleHeight / 2,
+    width: paddleWidth,
+    height: paddleHeight,
+    dy: 0,
+    speed: 4.5
+};
+
+const ball = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    size: ballSize,
+    dx: 4,
+    dy: 4,
+    speed: 4
+};
+
+let playerScore = 0;
+let computerScore = 0;
+
+// Input handling
+const keys = {};
+let mouseY = canvas.height / 2;
+
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+});
+
+document.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
+
+document.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseY = e.clientY - rect.top;
+});
+
+// Update functions
+function updatePlayer() {
+    // Arrow keys control
+    if (keys['ArrowUp'] && player.y > 0) {
+        player.y -= player.speed;
+    }
+    if (keys['ArrowDown'] && player.y < canvas.height - player.height) {
+        player.y += player.speed;
+    }
+
+    // Mouse control (optional, combined with arrow keys)
+    const mouseControl = true;
+    if (mouseControl) {
+        const paddleCenter = player.y + player.height / 2;
+        const distance = mouseY - paddleCenter;
+        if (Math.abs(distance) > 5) {
+            if (distance > 0 && player.y < canvas.height - player.height) {
+                player.y += Math.min(player.speed, distance);
+            } else if (distance < 0 && player.y > 0) {
+                player.y -= Math.min(player.speed, -distance);
+            }
+        }
+    }
+
+    // Boundary check
+    if (player.y < 0) player.y = 0;
+    if (player.y > canvas.height - player.height) player.y = canvas.height - player.height;
+}
+
+function updateComputer() {
+    const computerCenter = computer.y + computer.height / 2;
+    const distance = ball.y - computerCenter;
+
+    if (Math.abs(distance) > 10) {
+        if (distance > 0) {
+            computer.y += computer.speed;
+        } else {
+            computer.y -= computer.speed;
+        }
+    }
+
+    // Boundary check
+    if (computer.y < 0) computer.y = 0;
+    if (computer.y > canvas.height - computer.height) computer.y = canvas.height - computer.height;
+}
+
+function updateBall() {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // Top and bottom wall collision
+    if (ball.y - ball.size < 0 || ball.y + ball.size > canvas.height) {
+        ball.dy = -ball.dy;
+        ball.y = Math.max(ball.size, Math.min(canvas.height - ball.size, ball.y));
+    }
+
+    // Player paddle collision
+    if (
+        ball.x - ball.size < player.x + player.width &&
+        ball.y > player.y &&
+        ball.y < player.y + player.height
+    ) {
+        ball.dx = -ball.dx;
+        ball.x = player.x + player.width + ball.size;
+        
+        // Add spin based on paddle movement
+        const paddleCenter = player.y + player.height / 2;
+        const relativeIntersect = paddleCenter - ball.y;
+        ball.dy = -(relativeIntersect / (player.height / 2)) * ball.speed;
+    }
+
+    // Computer paddle collision
+    if (
+        ball.x + ball.size > computer.x &&
+        ball.y > computer.y &&
+        ball.y < computer.y + computer.height
+    ) {
+        ball.dx = -ball.dx;
+        ball.x = computer.x - ball.size;
+        
+        // Add spin based on paddle movement
+        const paddleCenter = computer.y + computer.height / 2;
+        const relativeIntersect = paddleCenter - ball.y;
+        ball.dy = -(relativeIntersect / (computer.height / 2)) * ball.speed;
+    }
+
+    // Left wall (player loses)
+    if (ball.x - ball.size < 0) {
+        computerScore++;
+        document.getElementById('computerScore').textContent = computerScore;
+        resetBall();
+    }
+
+    // Right wall (computer loses)
+    if (ball.x + ball.size > canvas.width) {
+        playerScore++;
+        document.getElementById('playerScore').textContent = playerScore;
+        resetBall();
+    }
+}
+
+function resetBall() {
+    ball.x = canvas.width / 2;
+    ball.y = canvas.height / 2;
+    ball.dx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+    ball.dy = (Math.random() - 0.5) * ball.speed;
+}
+
+// Draw functions
+function drawRect(x, y, width, height, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, width, height);
+}
+
+function drawCircle(x, y, size, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawCenterLine() {
+    ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+    ctx.setLineDash([10, 10]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function draw() {
+    // Clear canvas
+    drawRect(0, 0, canvas.width, canvas.height, '#0f1419');
+
+    // Draw center line
+    drawCenterLine();
+
+    // Draw paddles
+    drawRect(player.x, player.y, player.width, player.height, '#00d4ff');
+    drawRect(computer.x, computer.y, computer.width, computer.height, '#ff006e');
+
+    // Draw ball
+    drawCircle(ball.x, ball.y, ball.size, '#ffd60a');
+}
+
+// Game loop
+function gameLoop() {
+    updatePlayer();
+    updateComputer();
+    updateBall();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+gameLoop();
